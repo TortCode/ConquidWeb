@@ -1,0 +1,19 @@
+{
+  "name": "conquid-server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TortCode/ConquidWebServer.git"
+  },
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/TortCode/ConquidWebServer/issues"
+  },
+  "homepage": "https://github.com/TortCode/ConquidWebServer#readme"
+}
