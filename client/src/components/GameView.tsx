@@ -1,6 +1,7 @@
-import Board from "./Board";
+import React from 'react'
+import BoardView from './BoardView'
 
-function GameView() {
+function GameView (): JSX.Element {
   const bases = [
     {
       owner: 1,
@@ -14,13 +15,13 @@ function GameView() {
       startRow: 6,
       endRow: 7,
       startCol: 22,
-      endCol: 23,
+      endCol: 23
     }
   ]
 
   return (
-    <Board rows={14} cols={28} bases={bases} />
+    <BoardView rows={14} cols={28} bases={bases} />
   )
 }
 
-export default GameView;
+export default GameView
