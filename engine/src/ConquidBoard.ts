@@ -35,7 +35,7 @@ export class Board {
   constructor (rows: number, cols: number, bases: BaseLocation[]) {
     this.rows = rows
     this.cols = cols
-    this._grid = make2dArray<Cell>(rows, cols, () => (new Cell(0, false)))
+    this._grid = make2dArray<Cell>(rows, cols, () => (new Cell()))
     this.baseMap = new Map()
 
     bases.forEach((loc) => {
@@ -200,24 +200,24 @@ export class Board {
   }
 }
 
-interface AcquireMove {
+export interface AcquireMove {
   kind: 'acquire'
   player: Player
   locs: Position[]
 }
 
-interface ConquerMove {
+export interface ConquerMove {
   kind: 'conquer'
   player: Player
 }
 
-interface VanquishMove {
+export interface VanquishMove {
   kind: 'vanquish'
   player: Player
   topLeft: Position
 }
 
-interface ConquestMove {
+export interface ConquestMove {
   kind: 'conquest'
   player: Player
 }

@@ -53,7 +53,6 @@ function createBoard (
 function BoardView (props: BoardProps): JSX.Element {
   const [boardState, setBoardState] = useState([] as Cell[][])
   useEffect(() => {
-    console.log('RERENDERING')
     setBoardState(createBoard(props.rows, props.cols, props.bases) as never[])
   }, [])
 

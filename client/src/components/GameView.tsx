@@ -1,5 +1,9 @@
+import { io } from 'socket.io-client'
+import { Button } from '@chakra-ui/react'
 import React from 'react'
 import BoardView from './BoardView'
+
+const socket = io('http://localhost:3000')
 
 function GameView (): JSX.Element {
   const bases = [
@@ -19,8 +23,45 @@ function GameView (): JSX.Element {
     }
   ]
 
+  const onAcquire = () => {
+
+  }
+
+  const onConquer = () => {
+
+  }
+
+  const onVanquish = () => {
+
+  }
+
+  const onConquest = () => {
+
+  }
+
+  const onConfirm = () => {
+
+  }
+
   return (
-    <BoardView rows={14} cols={28} bases={bases} />
+    <>
+      <BoardView rows={14} cols={28} bases={bases} />
+      <Button onClick={onAcquire}>
+        Acquire
+      </Button>
+      <Button onClick={onConquer}>
+        Conquer
+      </Button>
+      <Button onClick={onVanquish}>
+        Vanquish
+      </Button>
+      <Button onClick={onConquest}>
+        Conquest
+      </Button>
+      <Button onClick={onConfirm}>
+        CONFIRM
+      </Button>
+    </>
   )
 }
 
