@@ -1,51 +1,120 @@
-import { io } from 'socket.io-client'
 import { Button } from '@chakra-ui/react'
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import BoardView from './BoardView'
+import { conquer, conquest, remoteCommit, restore, vanquish, acquireOne, unacquireOne } from '../reducers/boardHistoryReducer'
+import socket from '../socketService'
+import type { Position } from '../../../engine/src/ConquidBoard'
+import { useAppDispatch, useAppSelector } from '../hooks'
 
-const socket = io('http://localhost:3000')
+enum ActionMode {
+  Acquire = 'acquire',
+  Conquer = 'conquer',
+  Vanquish = 'vanquish',
+  Conquest = 'conquest',
+  None = 'none',
+}
+
+const getPlayerNo = async (): Promise<number> => {
+  const sspno = sessionStorage.getItem('pno')
+  if (sspno !== null) {
+    return parseInt(sspno)
+  }
+  const res = await socket.emitWithAck('getpno')
+  sessionStorage.setItem('pno', res)
+  return res
+}
 
 function GameView (): JSX.Element {
-  const bases = [
-    {
-      owner: 1,
-      startRow: 6,
-      endRow: 7,
-      startCol: 4,
-      endCol: 5
-    },
-    {
-      owner: 2,
-      startRow: 6,
-      endRow: 7,
-      startCol: 22,
-      endCol: 23
+  const dispatch = useAppDispatch()
+  const board = useAppSelector(state => state.boardHistory.preview)
+  const pendingMove = useAppSelector(state => state.boardHistory.pendingMove)
+  const [pno, setPno] = useState<number | null>(null)
+  const [action, setAction] = useState<ActionMode>(ActionMode.None)
+  useEffect(() => {
+    const runEffect = async (): Promise<void> => {
+      const pno = await getPlayerNo()
+      setPno(pno)
     }
-  ]
+    void runEffect()
+    return () => {
+      sessionStorage.removeItem('pno')
+    }
+  }, [])
 
-  const onAcquire = () => {
-
+  const onAcquire = (): void => {
+    if (pno === null || action !== ActionMode.None) return
+    setAction(ActionMode.Acquire)
   }
 
-  const onConquer = () => {
-
+  const onConquer = (): void => {
+    if (pno === null || action !== ActionMode.None) return
+    setAction(ActionMode.Conquer)
+    dispatch(conquer({ player: pno }))
   }
 
-  const onVanquish = () => {
-
+  const onVanquish = (): void => {
+    if (pno === null || action !== ActionMode.None) return
+    setAction(ActionMode.Vanquish)
   }
 
-  const onConquest = () => {
-
+  const onConquest = (): void => {
+    if (pno === null || action !== ActionMode.None) return
+    setAction(ActionMode.Conquest)
+    dispatch(conquest({ player: pno }))
   }
 
-  const onConfirm = () => {
+  const onUndo = (): void => {
+    if (pno === null || action === ActionMode.None) return
+    setAction(ActionMode.None)
+    dispatch(restore())
+  }
 
+  const onConfirm = (): void => {
+    if (pno === null || action === ActionMode.None) return
+    setAction(ActionMode.None)
+    void dispatch(remoteCommit())
+  }
+
+  const handleCellClick = (loc: Position): void => {
+    if (pno === null) return
+    console.log('click @', loc)
+    switch (action) {
+      case 'acquire': {
+        if (pendingMove !== null && pendingMove.kind === 'acquire') {
+          const l = pendingMove.locs.find(l => l.r === loc.r && l.c === loc.c)
+          if (l === undefined) {
+            if (pendingMove.locs.length < board.acquireCellCount) {
+              dispatch(acquireOne({ player: pno, loc }))
+            }
+          } else {
+            dispatch(unacquireOne({ loc }))
+          }
+        } else {
+          dispatch(acquireOne({ player: pno, loc }))
+        }
+        return
+      }
+      case 'vanquish': {
+        if (pendingMove !== null) {
+          dispatch(restore())
+        }
+        dispatch(vanquish({ player: pno, topLeft: loc }))
+      }
+    }
+  }
+
+  if (pno == null) {
+    return (
+      <>
+      </>
+    )
   }
 
   return (
     <>
-      <BoardView rows={14} cols={28} bases={bases} />
+      <BoardView
+        handleClick={handleCellClick}
+      />
       <Button onClick={onAcquire}>
         Acquire
       </Button>
@@ -57,6 +126,9 @@ function GameView (): JSX.Element {
       </Button>
       <Button onClick={onConquest}>
         Conquest
+      </Button>
+      <Button onClick={onUndo}>
+        UNDO
       </Button>
       <Button onClick={onConfirm}>
         CONFIRM

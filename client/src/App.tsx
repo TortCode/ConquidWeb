@@ -4,8 +4,7 @@ import { Provider as ReduxProvider } from 'react-redux'
 import GameView from './components/GameView'
 import store from './store'
 
-function App() {
-
+function App (): JSX.Element {
   return (
     <ReduxProvider store={store}>
       <ChakraProvider>

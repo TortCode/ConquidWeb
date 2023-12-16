@@ -2,7 +2,12 @@ import express from 'express'
 import cors from 'cors'
 import { createServer } from 'http'
 import { Server } from 'socket.io'
-import { Board, Move } from '../engine/src/ConquidBoard'
+import { Board } from '../engine/src/ConquidBoard'
+import type { Move } from '../engine/src/ConquidBoard'
+
+const assertNever = (x: never): never => {
+  throw new Error('Unexpected object: ' + (x as string))
+}
 
 const app = express()
 app.use(cors())
@@ -28,13 +33,21 @@ const bases = [
     endCol: 23
   }
 ]
-const board = new Board(14, 28, bases)
+
+const board = new Board(14, 28, bases, 3)
+let pno = 1
 
 io.on('connection', (socket) => {
   socket.on('message', (msg) => {
     console.log(msg)
   })
+  socket.on('getpno', (cb: (v: number) => void) => {
+    cb(pno)
+    console.log('ASSIGNED PNO', pno)
+    pno++
+  })
   socket.on('move', (move: Move) => {
+    console.log('MOVE', move)
     switch (move.kind) {
       case 'acquire':
         board.acquire(move.player, move.locs)
@@ -45,6 +58,12 @@ io.on('connection', (socket) => {
       case 'vanquish':
         board.vanquish(move.player, move.topLeft)
         break
+      case 'conquest':
+        board.conquest(move.player)
+        break
+      default: {
+        assertNever(move)
+      }
     }
     socket.broadcast.emit('move', move)
   })

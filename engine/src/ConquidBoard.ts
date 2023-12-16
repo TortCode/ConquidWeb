@@ -1,13 +1,12 @@
 import { make2dArray } from './utils'
 
 type Player = number
-class Cell {
-  owner: Player = 0
-  isBase: boolean = false
-  onPath: boolean = false
+export interface Cell {
+  owner: Player
+  isBase: boolean
 }
 
-interface Position {
+export interface Position {
   r: number
   c: number
 }
@@ -20,53 +19,112 @@ interface BaseLocation {
   endCol: number
 }
 
-class InvalidMoveError extends Error {
+export class InvalidMoveError extends Error {
 }
 
-export class Board {
-  private readonly rows: number
-  private readonly cols: number
-  private readonly baseMap: Map<Player, BaseLocation>
-  private readonly _grid: Cell[][]
-  get grid (): Cell[][] {
-    return this._grid
+export class AcquireCountError extends InvalidMoveError {
+  constructor(public readonly count: number) {
+    super(`Invalid number of cells acquired: ${count}`)
   }
+}
 
-  constructor (rows: number, cols: number, bases: BaseLocation[]) {
-    this.rows = rows
-    this.cols = cols
-    this._grid = make2dArray<Cell>(rows, cols, () => (new Cell()))
-    this.baseMap = new Map()
+export class NonEmptyCellError extends InvalidMoveError {
+  constructor(public readonly pos: Position) {
+    super(`Position ${pos.r},${pos.c} is not empty`)
+  }
+}
+
+export class NotSurroundedError extends InvalidMoveError {
+  constructor(public readonly pos: Position) {
+    super(`Position ${pos.r},${pos.c} is not surrounded`)
+  }
+}
+
+export class ColorMismatchError extends InvalidMoveError {
+  constructor(public readonly pos: Position) {
+    super(`Position ${pos.r},${pos.c} has a color mismatch`)
+  }
+}
+
+export class PathNotFoundError extends InvalidMoveError {
+  constructor() {
+    super(`Could not find path for conquest`)
+  }
+}
+
+export interface BoardLike {
+  rows: number
+  cols: number
+  grid: Cell[][]
+  path: Position[]
+  bases: BaseLocation[]
+  acquireCellCount: number
+}
+
+export class Board implements BoardLike {
+  public path: Position[]
+  public grid: Cell[][]
+
+  constructor (
+    public readonly rows: number,
+    public readonly cols: number,
+    public readonly bases: BaseLocation[], 
+    public readonly acquireCellCount: number) {
+    this.grid = make2dArray<Cell>(rows, cols, () => ({ owner: 0, isBase: false }))
+    this.path = []
 
     bases.forEach((loc) => {
-      this.baseMap.set(loc.owner, loc)
       for (let i = loc.startRow; i <= loc.endRow; i++) {
         for (let j = loc.startCol; j <= loc.endCol; j++) {
-          this._grid[i][j].owner = loc.owner
+          this.grid[i][j].owner = loc.owner
+          this.grid[i][j].isBase = true
         }
       }
     })
   }
 
-  acquire (player: Player, locs: Position[]): void {
+  toObject(): BoardLike {
+    return {
+      rows: this.rows,
+      cols: this.cols,
+      grid: this.grid,
+      path: this.path,
+      bases: this.bases,
+      acquireCellCount: this.acquireCellCount
+    }
+  }
+
+  check_acquire (player: Player, locs: Position[], desiredLength: number = this.acquireCellCount): void {
+    // deduplicate values
+    locs = [...new Set(locs)]
+    if (locs.length !== desiredLength) {
+      throw new AcquireCountError(locs.length)
+    }
     locs.forEach(loc => {
-      if (this._grid[loc.r][loc.c].owner !== 0) {
-        throw new InvalidMoveError(`Position ${loc.r},${loc.c} is not empty`)
+      if (this.grid[loc.r][loc.c].owner !== 0) {
+        throw new NonEmptyCellError(loc)
       }
     })
+  }
+
+  acquireOne (player: Player, loc: Position): void {
+    Board.prototype.check_acquire.call(this, player, [loc], 1)
+    this.grid[loc.r][loc.c].owner = player
+  }
+
+  acquire (player: Player, locs: Position[]): void {
+    Board.prototype.check_acquire.call(this, player, locs)
     locs.forEach(loc => {
-      this._grid[loc.r][loc.c].owner = player
+      this.grid[loc.r][loc.c].owner = player
     })
   }
 
   conquer (player: Player): void {
-    const touched: number[][] = new Array(this.rows)
+    const touched: number[][] = make2dArray<number>(this.rows, this.cols, () => 0)
     const q: Position[] = []
     for (let i = 0; i < this.rows; i++) {
-      touched[i] = new Array(this.cols)
       for (let j = 0; j < this.cols; j++) {
-        touched[i][j] = 0
-        if (this._grid[i][j].owner === player && !this._grid[i][j].isBase) {
+        if (this.grid[i][j].owner === player && !this.grid[i][j].isBase) {
           q.push({ r: i, c: j })
         }
       }
@@ -75,11 +133,14 @@ export class Board {
     // begin teh konker
     while (q.length > 0) {
       const curr = q.shift()!
-      this.adjacent(curr).forEach(adj => {
-        if (this._grid[adj.r][adj.c].owner !== player && !this._grid[adj.r][adj.c].isBase) {
+      Board.prototype.adjacent.call(this, curr).forEach(adj => {
+        if (
+          this.grid[adj.r][adj.c].owner !== 0
+          && this.grid[adj.r][adj.c].owner !== player 
+          && !this.grid[adj.r][adj.c].isBase) {
           touched[adj.r][adj.c] += 1
           if (touched[adj.r][adj.c] >= 2) {
-            this._grid[adj.r][adj.c].owner = player
+            this.grid[adj.r][adj.c].owner = player
             q.push(adj)
           }
         }
@@ -87,47 +148,56 @@ export class Board {
     }
   }
 
-  vanquish (player: Player, topLeft: Position): void {
+  check_vanquish(player: Player, topLeft: Position): void {
     let surrounding = 0
-    this.surround4x4(topLeft).forEach(surr => {
-      if (this._grid[surr.r][surr.c].owner === player) {
+    Board.prototype.surround4x4.call(this, topLeft).forEach(surr => {
+      if (this.grid[surr.r][surr.c].owner === player) {
         surrounding += 1
       }
     })
     if (surrounding < 4) {
-      throw new InvalidMoveError(`Square at ${topLeft.r},${topLeft.c} is not sufficiently surrounded`)
+      throw new NotSurroundedError(topLeft)
     }
 
     let squareOwner = 0
     let foundOwner = false
     const square: Cell[] = []
-    for (let i = topLeft.r; i < topLeft.r + 4; i++) {
-      for (let j = topLeft.c; j < topLeft.c + 4; j++) {
-        if (this.posValid({ r: i, c: j })) {
-          const curr = this._grid[i][j]
+    for (let r = topLeft.r; r < topLeft.r + 4; r++) {
+      for (let c = topLeft.c; c < topLeft.c + 4; c++) {
+        if (Board.prototype.posValid.call(this, { r, c })) {
+          const curr = this.grid[r][c]
           if (!foundOwner && !curr.isBase) {
             squareOwner = curr.owner
             foundOwner = true
           } else if (curr.owner !== squareOwner) {
-            throw new InvalidMoveError(`Cell at ${i},${j} has a color mismatch with the square`)
-          }
-          if (!curr.isBase) {
-            square.push(curr)
+            throw new ColorMismatchError(topLeft)
           }
         }
       }
     }
-
-    square.forEach(sq => {
-      sq.owner = 0
-    })
   }
 
-  conquest (player: Player): void {
+  vanquish (player: Player, topLeft: Position): void {
+    Board.prototype.check_vanquish.call(this, player, topLeft)
+
+    const square: Cell[] = []
+    for (let r = topLeft.r; r < topLeft.r + 4; r++) {
+      for (let c = topLeft.c; c < topLeft.c + 4; c++) {
+        if (Board.prototype.posValid.call(this, { r, c })) {
+          const curr = this.grid[r][c]
+          if (!curr.isBase) {
+            curr.owner = 0
+          }
+        }
+      }
+    }
+  }
+
+  check_conquest (player: Player): Position[] {
     const visited = make2dArray<boolean>(this.rows, this.cols, () => false)
     const prev = make2dArray<Position | null>(this.rows, this.cols, () => null)
 
-    const baseRegion = this.baseMap.get(player)
+    const baseRegion = this.bases[player - 1]
     if (baseRegion === undefined) {
       throw new InvalidMoveError(`Cannot find base for player ${player}`)
     }
@@ -136,12 +206,14 @@ export class Board {
     const base: Position = { r: baseRegion.startRow, c: baseRegion.endCol }
     q.push(base)
 
+    const path = [base]
+
     let found = false
     while (q.length > 0 && !found) {
       const curr = q.shift()!
       visited[curr.r][curr.c] = true
-      this.adjacent(curr).forEach(adj => {
-        const adjCell = this._grid[adj.r][adj.c]
+      Board.prototype.adjacent.call(this, curr).forEach(adj => {
+        const adjCell = this.grid[adj.r][adj.c]
         if (!visited[curr.r][curr.c] &&
           adjCell.owner === player) {
           prev[adj.r][adj.c] = curr
@@ -149,11 +221,11 @@ export class Board {
         }
         if (adjCell.isBase && adjCell.owner !== 0 && adjCell.owner !== player) {
           let currPos = curr
-          let currCell = this._grid[curr.r][curr.c]
+          let currCell = this.grid[curr.r][curr.c]
           while (!(currCell.isBase && currCell.owner === player)) {
-            currCell.onPath = true
+            path.push(currPos)
             currPos = prev[currPos.r][currPos.c]!
-            currCell = this._grid[curr.r][curr.c]
+            currCell = this.grid[curr.r][curr.c]
           }
           found = true
         }
@@ -161,8 +233,14 @@ export class Board {
     }
 
     if (!found) {
-      throw new InvalidMoveError(`Could not find conquest path for ${player}`)
+      throw new PathNotFoundError()
     }
+    return path
+  }
+
+  conquest (player: Player): void {
+    const path = Board.prototype.check_conquest.call(this, player)
+    this.path = path
   }
 
   private posValid (curr: Position): boolean {
@@ -180,7 +258,7 @@ export class Board {
         r: curr.r + offset[0],
         c: curr.c + offset[1]
       }))
-      .filter(pos => (this.posValid(pos)))
+      .filter(pos => (Board.prototype.posValid.call(this,pos)))
   }
 
   private surround4x4 (topLeft: Position): Position[] {
@@ -196,7 +274,7 @@ export class Board {
         r: topLeft.r + offset[0],
         c: topLeft.c + offset[1]
       }))
-      .filter(pos => (this.posValid(pos)))
+      .filter(pos => (Board.prototype.posValid.call(this,pos)))
   }
 }
 

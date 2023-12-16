@@ -1,62 +1,42 @@
 import { Button } from '@chakra-ui/react'
-import React, { useEffect, useState } from 'react'
+import React from 'react'
+import { useAppSelector } from '../hooks'
+import type { Position } from '../../../engine/src/ConquidBoard'
 
-interface BaseLocation {
-  owner: number
-  startRow: number
-  startCol: number
-  endRow: number
-  endCol: number
+interface BoardViewProps {
+  handleClick: (pos: Position) => void
 }
 
-interface BoardProps {
-  rows: number
-  cols: number
-  bases: BaseLocation[]
-}
-
-interface Cell {
-  owner: number
-  isBase: boolean
-}
-
-function createBoard (
-  rows: number,
-  cols: number,
-  bases: BaseLocation[]
-): Cell[][] {
-  const boardStates: Cell[][] = new Array(rows)
-  for (let i = 0; i < boardStates.length; i++) {
-    boardStates[i] = new Array(cols)
-    for (let j = 0; j < boardStates[i].length; j++) {
-      boardStates[i][j] = {
-        owner: 0,
-        isBase: false
-      }
-    }
+function blendColors (colorA: string, colorB: string): string {
+  const mix = (a: number, b: number): number => Math.round(Math.sqrt((a * a + b * b) / 2))
+  function toHexString (n: number): string {
+    return n.toString(16).padStart(2, '0')
   }
 
-  bases.forEach((loc) => {
-    for (let i = loc.startRow; i <= loc.endRow; i++) {
-      for (let j = loc.startCol; j <= loc.endCol; j++) {
-        boardStates[i][j] = {
-          owner: loc.owner,
-          isBase: true
-        }
-      }
-    }
-  })
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+  const [rA, gA, bA] = colorA.match(/\w\w/g)!.map((c: string) => parseInt(c, 16))
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+  const [rB, gB, bB] = colorB.match(/\w\w/g)!.map((c: string) => parseInt(c, 16))
 
-  return boardStates
+  const r = mix(rA, rB)
+  const g = mix(gA, gB)
+  const b = mix(bA, bB)
+  return '#' + toHexString(r) + toHexString(g) + toHexString(b)
 }
 
-function BoardView (props: BoardProps): JSX.Element {
-  const [boardState, setBoardState] = useState([] as Cell[][])
-  useEffect(() => {
-    setBoardState(createBoard(props.rows, props.cols, props.bases) as never[])
-  }, [])
+function BoardView (props: BoardViewProps): JSX.Element {
+  const originalBoard = useAppSelector(state => state.boardHistory.boards[state.boardHistory.boards.length - 1])
+  const previewBoard = useAppSelector(state => state.boardHistory.preview)
 
-  const colors = ['#fff', '#f8a', '#8fa', '#a8f', '#af8', '#fa8', '#8af']
+  const colors = ['#ffffff', '#ff88aa', '#88ffaa', '#aa88ff', '#aaff88', '#ffaa88', '#88aaff']
+
+  const getColor = (r: number, c: number): string => {
+    const cA = colors[previewBoard.grid[r][c].owner % colors.length]
+    const cB = colors[originalBoard.grid[r][c].owner % colors.length]
+    const mixed = blendColors(cA, cB)
+    // console.log(`color @ (${r}, ${c}) is ${mixed}`)
+    return mixed
+  }
 
   return (
     <div
@@ -68,7 +48,7 @@ function BoardView (props: BoardProps): JSX.Element {
         backgroundColor: '#eeeeee'
       }}
     >
-      {boardState.map((row, i) => (
+      {previewBoard.grid.map((row, i) => (
         <div
           key={i}
           style={{
@@ -84,24 +64,14 @@ function BoardView (props: BoardProps): JSX.Element {
               size="sm"
               maxWidth="2em"
               maxHeight="3em"
-              backgroundColor={colors[val.owner]}
+              backgroundColor={getColor(i, j)}
               borderWidth={val.isBase ? '0.10em' : '0'}
               borderRadius={0}
               borderColor="black"
               margin="1px"
               isDisabled={val.isBase}
               onClick={() => {
-                const newBoardState = boardState.map((rowValue, rowIndex) => {
-                  if (rowIndex !== i) return rowValue
-                  return rowValue.map((colValue, colIndex) => {
-                    if (colIndex !== j) return colValue
-                    return {
-                      ...colValue,
-                      owner: 1
-                    }
-                  })
-                })
-                setBoardState(newBoardState)
+                props.handleClick({ r: i, c: j })
               }}
             ></Button>
           ))}
