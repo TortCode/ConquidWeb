@@ -27,7 +27,6 @@ const app = express()
 app.use(express.json())
 app.use(cors())
 
-console.log(usersRouter)
 app.use('/api/users', usersRouter)
 app.use('/api/login', loginRouter)
 
