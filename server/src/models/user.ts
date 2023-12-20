@@ -12,7 +12,7 @@ const schema = new mongoose.Schema<IUser>({
     type: String,
     required: true,
     unique: true,
-    minLength: 8
+    minLength: 2
   },
   name: {
     type: String,

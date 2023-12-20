@@ -1,16 +1,36 @@
 import express from 'express'
 import cors from 'cors'
+import dotenv from 'dotenv'
+import mongoose from 'mongoose'
 import { createServer } from 'http'
 import { Server } from 'socket.io'
 import { BadMoveError, Board } from '../../engine/src/ConquidBoard'
 import type { Move } from '../../engine/src/ConquidBoard'
+
+import usersRouter from './controllers/users'
+import loginRouter from './controllers/login'
+
+dotenv.config()
+
+mongoose.connect(`mongodb+srv://conquiddb:${encodeURIComponent(process.env.MONGODB_PASSWORD!)}@cluster0.nu2w891.mongodb.net/testdb?retryWrites=true&w=majority`).then(() => {
+  console.log('connected to MongoDB')
+}).catch((error) => {
+  console.log('error connecting to MongoDB:', error.message)
+  throw error
+})
 
 const assertNever = (x: never): never => {
   throw new Error('Unexpected object: ' + (x as string))
 }
 
 const app = express()
+app.use(express.json())
 app.use(cors())
+
+console.log(usersRouter)
+app.use('/api/users', usersRouter)
+app.use('/api/login', loginRouter)
+
 const server = createServer(app)
 const io = new Server(server, {
   cors: {

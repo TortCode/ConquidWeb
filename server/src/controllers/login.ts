@@ -24,3 +24,5 @@ router.post('/', async (req, res) => {
   })
   res.json({ token, ...signingUser })
 })
+
+export default router
