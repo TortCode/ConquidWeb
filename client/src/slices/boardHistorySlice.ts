@@ -23,12 +23,13 @@ const bases = [
 ]
 
 const board = (new Board(14, 28, bases, 3)).toObject()
+console.log(board)
 
 const slice = createSlice({
   name: 'boardHistory',
   initialState: {
     boards: [board],
-    preview: board,
+    preview: JSON.parse(JSON.stringify(board)),
     pendingMove: null as Move | null,
     canCommit: false
   },
@@ -105,7 +106,7 @@ const slice = createSlice({
       state.canCommit = false
     },
     restore: (state) => {
-      state.preview = state.boards[state.boards.length - 1]
+      state.preview = JSON.parse(JSON.stringify(state.boards[state.boards.length - 1]))
       state.pendingMove = null
       state.canCommit = false
     }

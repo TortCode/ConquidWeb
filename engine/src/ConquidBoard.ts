@@ -144,7 +144,7 @@ export class Board implements BoardLike {
       throw BadMoveError.acquireCount(locs.length)
     }
     locs.forEach(loc => {
-      if (!Board.prototype.posValid(loc)) {
+      if (!Board.prototype.posValid.call(this, loc)) {
         throw BadMoveError.outOfBounds(loc)
       }
       if (this.grid[loc.r][loc.c].owner !== 0) {
@@ -154,6 +154,7 @@ export class Board implements BoardLike {
   }
 
   acquireOne (player: Player, loc: Position): void {
+    console.log(this)
     Board.prototype.check_acquire.call(this, player, [loc], 1)
     this.grid[loc.r][loc.c].owner = player
   }
