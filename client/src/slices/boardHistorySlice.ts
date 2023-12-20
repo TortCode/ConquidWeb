@@ -44,6 +44,7 @@ const slice = createSlice({
         throw new Error('Cell not selected')
       }
       state.preview.grid[loc.r][loc.c].owner = 0
+      state.pendingMove.locs.splice(index, 1)
       state.canCommit = false
     },
     acquireOne: (state, action: PayloadAction<{ player: number, loc: Position }>) => {
