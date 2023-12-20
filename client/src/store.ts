@@ -1,6 +1,7 @@
 import { configureStore } from '@reduxjs/toolkit'
 import type { Middleware } from '@reduxjs/toolkit'
-import boardHistoryReducer, { acquire, commit, conquer, conquest, vanquish } from './reducers/boardHistoryReducer'
+import boardHistorySlice, { acquire, commit, conquer, conquest, vanquish } from './slices/boardHistorySlice'
+import userSlice from './slices/userSlice'
 import socket from './socketService'
 import type { Socket } from 'socket.io-client'
 import type { Move } from '../../engine/src/ConquidBoard'
@@ -31,7 +32,8 @@ const socketMiddleware = (socket: Socket): Middleware => {
 
 const store = configureStore({
   reducer: {
-    boardHistory: boardHistoryReducer
+    boardHistory: boardHistorySlice,
+    user: userSlice
   },
   middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(socketMiddleware(socket))
 })

@@ -3,7 +3,7 @@ import type { PayloadAction } from '@reduxjs/toolkit'
 import { Board } from '../../../engine/src/ConquidBoard'
 import socket from '../socketService'
 import type { RootState } from '../store'
-import type { BoardLike, Move, AcquireMove, ConquerMove, VanquishMove, ConquestMove, Position } from '../../../engine/src/ConquidBoard'
+import type { Move, AcquireMove, ConquerMove, VanquishMove, ConquestMove, Position } from '../../../engine/src/ConquidBoard'
 
 const bases = [
   {
@@ -28,7 +28,7 @@ const slice = createSlice({
   name: 'boardHistory',
   initialState: {
     boards: [board],
-    preview: JSON.parse(JSON.stringify(board)) as BoardLike,
+    preview: board,
     pendingMove: null as Move | null,
     canCommit: false
   },
@@ -105,7 +105,7 @@ const slice = createSlice({
       state.canCommit = false
     },
     restore: (state) => {
-      state.preview = JSON.parse(JSON.stringify(state.boards[state.boards.length - 1])) as BoardLike
+      state.preview = state.boards[state.boards.length - 1]
       state.pendingMove = null
       state.canCommit = false
     }

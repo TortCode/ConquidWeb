@@ -19,36 +19,72 @@ interface BaseLocation {
   endCol: number
 }
 
-export class InvalidMoveError extends Error {
+export type BadMoveErrorLike = {
+  name: 'acquireCount'
+  count: number
+} | {
+  name: 'nonEmptyCell'
+  pos: Position
+} | {
+  name: 'notSurroundedCell'
+  pos: Position
+} | {
+  name: 'colorMismatch'
+  pos: Position
+} | {
+  name: 'pathNotFound'
+} | {
+  name: 'outOfBounds',
+  pos: Position
 }
 
-export class AcquireCountError extends InvalidMoveError {
-  constructor(public readonly count: number) {
-    super(`Invalid number of cells acquired: ${count}`)
+export class BadMoveError {
+  constructor(private readonly err: BadMoveErrorLike) {
   }
-}
 
-export class NonEmptyCellError extends InvalidMoveError {
-  constructor(public readonly pos: Position) {
-    super(`Position ${pos.r},${pos.c} is not empty`)
+  unwrap() {
+    return this.err
   }
-}
 
-export class NotSurroundedError extends InvalidMoveError {
-  constructor(public readonly pos: Position) {
-    super(`Position ${pos.r},${pos.c} is not surrounded`)
+  static acquireCount(count: number) {
+    return new BadMoveError({
+      name: 'acquireCount',
+      count
+    })
   }
-}
 
-export class ColorMismatchError extends InvalidMoveError {
-  constructor(public readonly pos: Position) {
-    super(`Position ${pos.r},${pos.c} has a color mismatch`)
+  static nonEmptyCell(pos: Position) {
+    return new BadMoveError({
+      name: 'nonEmptyCell',
+      pos
+    })
   }
-}
 
-export class PathNotFoundError extends InvalidMoveError {
-  constructor() {
-    super(`Could not find path for conquest`)
+  static notSurroundedCell(pos: Position) {
+    return new BadMoveError({
+      name: 'notSurroundedCell',
+      pos
+    })
+  }
+
+  static outOfBounds(pos: Position) {
+    return new BadMoveError({
+      name: 'outOfBounds',
+      pos
+    })
+  }
+
+  static pathNotFound() {
+    return new BadMoveError({
+      name: 'pathNotFound'
+    })
+  }
+
+  static colorMismatch(pos: Position) {
+    return new BadMoveError({
+      name: 'colorMismatch',
+      pos
+    })
   }
 }
 
@@ -94,15 +130,25 @@ export class Board implements BoardLike {
     }
   }
 
+  clone(): Board {
+    const board = new Board(this.rows, this.cols, this.bases, this.acquireCellCount)
+    board.grid = JSON.parse(JSON.stringify(this.grid))
+    board.path = JSON.parse(JSON.stringify(this.path))
+    return board
+  }
+
   check_acquire (player: Player, locs: Position[], desiredLength: number = this.acquireCellCount): void {
     // deduplicate values
     locs = [...new Set(locs)]
     if (locs.length !== desiredLength) {
-      throw new AcquireCountError(locs.length)
+      throw BadMoveError.acquireCount(locs.length)
     }
     locs.forEach(loc => {
+      if (!Board.prototype.posValid(loc)) {
+        throw BadMoveError.outOfBounds(loc)
+      }
       if (this.grid[loc.r][loc.c].owner !== 0) {
-        throw new NonEmptyCellError(loc)
+        throw BadMoveError.nonEmptyCell(loc)
       }
     })
   }
@@ -122,10 +168,10 @@ export class Board implements BoardLike {
   conquer (player: Player): void {
     const touched: number[][] = make2dArray<number>(this.rows, this.cols, () => 0)
     const q: Position[] = []
-    for (let i = 0; i < this.rows; i++) {
-      for (let j = 0; j < this.cols; j++) {
-        if (this.grid[i][j].owner === player && !this.grid[i][j].isBase) {
-          q.push({ r: i, c: j })
+    for (let r = 0; r < this.rows; r++) {
+      for (let c = 0; c < this.cols; c++) {
+        if (this.grid[r][c].owner === player && !this.grid[r][c].isBase) {
+          q.push({ r, c })
         }
       }
     }
@@ -134,13 +180,14 @@ export class Board implements BoardLike {
     while (q.length > 0) {
       const curr = q.shift()!
       Board.prototype.adjacent.call(this, curr).forEach(adj => {
+        const { r, c } = adj
         if (
-          this.grid[adj.r][adj.c].owner !== 0
-          && this.grid[adj.r][adj.c].owner !== player 
-          && !this.grid[adj.r][adj.c].isBase) {
-          touched[adj.r][adj.c] += 1
-          if (touched[adj.r][adj.c] >= 2) {
-            this.grid[adj.r][adj.c].owner = player
+          this.grid[r][c].owner !== 0
+          && this.grid[r][c].owner !== player 
+          && !this.grid[r][c].isBase) {
+          touched[r][c] += 1
+          if (touched[r][c] >= 2) {
+            this.grid[r][c].owner = player
             q.push(adj)
           }
         }
@@ -151,27 +198,28 @@ export class Board implements BoardLike {
   check_vanquish(player: Player, topLeft: Position): void {
     let surrounding = 0
     Board.prototype.surround4x4.call(this, topLeft).forEach(surr => {
-      if (this.grid[surr.r][surr.c].owner === player) {
+      if (Board.prototype.posValid.call(this, surr)
+      && this.grid[surr.r][surr.c].owner === player) {
         surrounding += 1
       }
     })
     if (surrounding < 4) {
-      throw new NotSurroundedError(topLeft)
+      throw BadMoveError.notSurroundedCell(topLeft)
     }
 
     let squareOwner = 0
     let foundOwner = false
-    const square: Cell[] = []
     for (let r = topLeft.r; r < topLeft.r + 4; r++) {
       for (let c = topLeft.c; c < topLeft.c + 4; c++) {
-        if (Board.prototype.posValid.call(this, { r, c })) {
-          const curr = this.grid[r][c]
-          if (!foundOwner && !curr.isBase) {
-            squareOwner = curr.owner
-            foundOwner = true
-          } else if (curr.owner !== squareOwner) {
-            throw new ColorMismatchError(topLeft)
-          }
+        if (!Board.prototype.posValid({ r, c })) {
+          throw BadMoveError.outOfBounds({ r, c })
+        }
+        const curr = this.grid[r][c]
+        if (!foundOwner && !curr.isBase) {
+          squareOwner = curr.owner
+          foundOwner = true
+        } else if (curr.owner !== squareOwner) {
+          throw BadMoveError.colorMismatch(topLeft)
         }
       }
     }
@@ -199,7 +247,7 @@ export class Board implements BoardLike {
 
     const baseRegion = this.bases[player - 1]
     if (baseRegion === undefined) {
-      throw new InvalidMoveError(`Cannot find base for player ${player}`)
+      throw new Error(`Cannot find base for player ${player}`)
     }
 
     const q: Position[] = []
@@ -233,7 +281,7 @@ export class Board implements BoardLike {
     }
 
     if (!found) {
-      throw new PathNotFoundError()
+      throw BadMoveError.pathNotFound()
     }
     return path
   }

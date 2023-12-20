@@ -1,7 +1,7 @@
 import { Button } from '@chakra-ui/react'
 import React, { useEffect, useState } from 'react'
 import BoardView from './BoardView'
-import { conquer, conquest, remoteCommit, restore, vanquish, acquireOne, unacquireOne } from '../reducers/boardHistoryReducer'
+import { conquer, conquest, remoteCommit, restore, vanquish, acquireOne, unacquireOne } from '../slices/boardHistorySlice'
 import socket from '../socketService'
 import type { Position } from '../../../engine/src/ConquidBoard'
 import { useAppDispatch, useAppSelector } from '../hooks'

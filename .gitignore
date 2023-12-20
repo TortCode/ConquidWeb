@@ -145,3 +145,6 @@ dist
 .yarn/install-state.gz
 .pnp.*
 
+
+# no js this be a typescript project
+*.js
