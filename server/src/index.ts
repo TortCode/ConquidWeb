@@ -2,8 +2,12 @@ import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
 import mongoose from 'mongoose'
+import User from './models/user'
 import { createServer } from 'http'
 import { Server } from 'socket.io'
+
+import { authMiddleware } from './utils/middleware'
+
 import { BadMoveError, Board } from '../../engine/src/ConquidBoard'
 import type { Move } from '../../engine/src/ConquidBoard'
 
@@ -12,7 +16,11 @@ import loginRouter from './controllers/login'
 
 dotenv.config()
 
-mongoose.connect(`mongodb+srv://conquiddb:${encodeURIComponent(process.env.MONGODB_PASSWORD!)}@cluster0.nu2w891.mongodb.net/testdb?retryWrites=true&w=majority`).then(() => {
+const DB_NAME = process.env.NODE_ENV === 'test' ? 'testdb' : 'proddb'
+
+mongoose.connect(
+  `mongodb+srv://${process.env.MONGO_USER}:${encodeURIComponent(process.env.MONGO_PASSWORD as string)}@${process.env.MONGO_HOST}/${DB_NAME}?retryWrites=true&w=majority`
+).then(() => {
   console.log('connected to MongoDB')
 }).catch((error) => {
   console.log('error connecting to MongoDB:', error.message)
@@ -55,21 +63,39 @@ const bases = [
 ]
 
 const boards = [new Board(14, 28, bases, 3)]
-let pno = 1
+const moves = [] as Move[]
+const playerIds = [] as string[]
+
+io.use(authMiddleware)
 
 io.on('connection', (socket) => {
   socket.on('message', (msg) => {
     console.log(msg)
   })
-  socket.on('getpno', (cb: (v: number) => void) => {
-    cb(pno)
-    console.log('ASSIGNED PNO', pno)
-    pno++
+  socket.on('joingame', async (cb: (v: { moves: Move[], pno: number }) => void) => {
+    if (playerIds.length === 2) {
+      console.log('game full')
+      return
+    }
+    const userId = socket.data.userId as string
+    const user = await User.findById(userId)
+    if (user === null) {
+      console.log(`user ${userId} not found`)
+      return
+    }
+    if (playerIds.includes(userId)) {
+      console.log(`user ${userId} already joined`)
+    } else {
+      playerIds.push(userId)
+    }
+    // eslint-disable-next-line n/no-callback-literal
+    cb({ moves, pno: playerIds.indexOf(userId) + 1 })
   })
   socket.on('move', (move: Move) => {
+    const userId = socket.data.userId as string
+    const expectedPlayer = playerIds.indexOf(userId) + 1
     console.log('MOVE', move)
     try {
-      const expectedPlayer = (boards.length - 1) % 2 + 1
       if (expectedPlayer !== move.player) {
         throw new Error('NOT YOUR TURN!!!')
       }

@@ -2,8 +2,8 @@ import { Button } from '@chakra-ui/react'
 import React, { useEffect, useState } from 'react'
 import BoardView from './BoardView'
 import { conquer, conquest, remoteCommit, restore, vanquish, acquireOne, unacquireOne } from '../slices/boardHistorySlice'
-import socket from '../socketService'
-import type { Position } from '../../../engine/src/ConquidBoard'
+import socket from '../services/socket'
+import { Board, type Position } from '../../../engine/src/ConquidBoard'
 import { useAppDispatch, useAppSelector } from '../hooks'
 
 enum ActionMode {
@@ -41,6 +41,13 @@ function GameView (): JSX.Element {
     }
   }, [])
 
+  if (board === null || pno === null) {
+    return (
+      <>
+      </>
+    )
+  }
+
   const onAcquire = (): void => {
     if (pno === null || action !== ActionMode.None) return
     setAction(ActionMode.Acquire)
@@ -60,7 +67,12 @@ function GameView (): JSX.Element {
   const onConquest = (): void => {
     if (pno === null || action !== ActionMode.None) return
     setAction(ActionMode.Conquest)
-    dispatch(conquest({ player: pno }))
+    try {
+      Board.prototype.check_conquest.call(board, pno)
+      dispatch(conquest({ player: pno }))
+    } catch (e) {
+      console.log(e)
+    }
   }
 
   const onUndo = (): void => {
@@ -77,13 +89,13 @@ function GameView (): JSX.Element {
 
   const handleCellClick = (loc: Position): void => {
     if (pno === null) return
-    console.log('click @', loc)
+
     switch (action) {
       case 'acquire': {
         if (pendingMove !== null && pendingMove.kind === 'acquire') {
           const l = pendingMove.locs.find(l => l.r === loc.r && l.c === loc.c)
-          if (l === undefined) {
-            if (pendingMove.locs.length < board.acquireCellCount) {
+          if (l === undefined && pendingMove.locs.length < board.acquireCount) {
+            if (pendingMove.locs.length < board.acquireCount) {
               dispatch(acquireOne({ player: pno, loc }))
             }
           } else {
@@ -98,16 +110,14 @@ function GameView (): JSX.Element {
         if (pendingMove !== null) {
           dispatch(restore())
         }
-        dispatch(vanquish({ player: pno, topLeft: loc }))
+        try {
+          Board.prototype.check_vanquish.call(board, pno, loc)
+          dispatch(vanquish({ player: pno, topLeft: loc }))
+        } catch (e) {
+          console.log(e)
+        }
       }
     }
-  }
-
-  if (pno == null) {
-    return (
-      <>
-      </>
-    )
   }
 
   return (

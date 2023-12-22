@@ -1,5 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit'
 import { type AppDispatch } from '../store'
+import socket from '../services/socket'
 
 export interface UserData {
   token: string
@@ -20,26 +21,31 @@ const slice = createSlice({
   }
 })
 
+const USER_STORAGE_KEY = 'user'
+
 export const initUserStorage = () => {
   return (dispatch: AppDispatch) => {
-    const loggedUserJSON = window.localStorage.getItem('conquidUser')
-    if (loggedUserJSON !== null) {
-      const user = JSON.parse(loggedUserJSON)
+    const userJSON = window.localStorage.getItem(USER_STORAGE_KEY)
+    if (userJSON !== null) {
+      const user = JSON.parse(userJSON)
       dispatch(setUser(user))
+      socket.connect()
     }
   }
 }
 
 export const setUserStorage = (user: UserData) => {
   return (dispatch: AppDispatch) => {
-    window.localStorage.setItem('conquidUser', JSON.stringify(user))
+    window.localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user))
     dispatch(setUser(user))
+    socket.connect()
   }
 }
 
 export const clearUserStorage = () => {
   return (dispatch: AppDispatch) => {
-    window.localStorage.removeItem('conquidUser')
+    window.localStorage.removeItem(USER_STORAGE_KEY)
+    socket.disconnect()
     dispatch(clearUser())
   }
 }

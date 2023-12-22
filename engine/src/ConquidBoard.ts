@@ -1,6 +1,6 @@
 import { make2dArray } from './utils'
 
-type Player = number
+export type Player = number
 export interface Cell {
   owner: Player
   isBase: boolean
@@ -11,7 +11,7 @@ export interface Position {
   c: number
 }
 
-interface BaseLocation {
+export interface BaseLocation {
   owner: number
   startRow: number
   startCol: number
@@ -94,7 +94,7 @@ export interface BoardLike {
   grid: Cell[][]
   path: Position[]
   bases: BaseLocation[]
-  acquireCellCount: number
+  acquireCount: number
 }
 
 export class Board implements BoardLike {
@@ -105,7 +105,7 @@ export class Board implements BoardLike {
     public readonly rows: number,
     public readonly cols: number,
     public readonly bases: BaseLocation[], 
-    public readonly acquireCellCount: number) {
+    public readonly acquireCount: number) {
     this.grid = make2dArray<Cell>(rows, cols, () => ({ owner: 0, isBase: false }))
     this.path = []
 
@@ -126,18 +126,18 @@ export class Board implements BoardLike {
       grid: this.grid,
       path: this.path,
       bases: this.bases,
-      acquireCellCount: this.acquireCellCount
+      acquireCount: this.acquireCount
     }
   }
 
   clone(): Board {
-    const board = new Board(this.rows, this.cols, this.bases, this.acquireCellCount)
+    const board = new Board(this.rows, this.cols, this.bases, this.acquireCount)
     board.grid = JSON.parse(JSON.stringify(this.grid))
     board.path = JSON.parse(JSON.stringify(this.path))
     return board
   }
 
-  check_acquire (player: Player, locs: Position[], desiredLength: number = this.acquireCellCount): void {
+  check_acquire (player: Player, locs: Position[], desiredLength: number = this.acquireCount): void {
     // deduplicate values
     locs = [...new Set(locs)]
     if (locs.length !== desiredLength) {

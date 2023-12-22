@@ -2,7 +2,7 @@ import { configureStore } from '@reduxjs/toolkit'
 import type { Middleware } from '@reduxjs/toolkit'
 import boardHistorySlice, { acquire, commit, conquer, conquest, vanquish } from './slices/boardHistorySlice'
 import userSlice from './slices/userSlice'
-import socket from './socketService'
+import socket from './services/socket'
 import type { Socket } from 'socket.io-client'
 import type { Move } from '../../engine/src/ConquidBoard'
 

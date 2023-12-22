@@ -1,40 +1,31 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 import type { PayloadAction } from '@reduxjs/toolkit'
 import { Board } from '../../../engine/src/ConquidBoard'
-import socket from '../socketService'
+import socket from '../services/socket'
 import type { RootState } from '../store'
-import type { Move, AcquireMove, ConquerMove, VanquishMove, ConquestMove, Position } from '../../../engine/src/ConquidBoard'
-
-const bases = [
-  {
-    owner: 1,
-    startRow: 6,
-    endRow: 7,
-    startCol: 4,
-    endCol: 5
-  },
-  {
-    owner: 2,
-    startRow: 6,
-    endRow: 7,
-    startCol: 22,
-    endCol: 23
-  }
-]
-
-const board = (new Board(14, 28, bases, 3)).toObject()
-console.log(board)
+import type { BoardLike, Move, AcquireMove, ConquerMove, VanquishMove, ConquestMove, Position, BaseLocation } from '../../../engine/src/ConquidBoard'
 
 const slice = createSlice({
   name: 'boardHistory',
   initialState: {
-    boards: [board],
-    preview: JSON.parse(JSON.stringify(board)),
+    boards: [] as BoardLike[],
+    preview: null as BoardLike | null,
     pendingMove: null as Move | null,
     canCommit: false
   },
   reducers: {
+    initBoard: (state, action: PayloadAction<{ rows: number, cols: number, bases: BaseLocation[], acquireCount: number }>) => {
+      const { rows, cols, bases, acquireCount } = action.payload
+      const board = (new Board(rows, cols, bases, acquireCount)).toObject()
+      state.boards.push(board)
+      state.preview = board
+      state.pendingMove = null
+      state.canCommit = false
+    },
     unacquireOne: (state, action: PayloadAction<{ loc: Position }>) => {
+      if (state.preview === null) {
+        throw new Error('No board yet')
+      }
       const { loc } = action.payload
       if (state.pendingMove === null || state.pendingMove.kind !== 'acquire') {
         throw new Error('No acquire move pending')
@@ -48,11 +39,14 @@ const slice = createSlice({
       state.canCommit = false
     },
     acquireOne: (state, action: PayloadAction<{ player: number, loc: Position }>) => {
+      if (state.preview === null) {
+        throw new Error('No board yet')
+      }
       const { player, loc } = action.payload
       if (state.pendingMove !== null) {
         if (state.pendingMove.kind !== 'acquire') {
           throw new Error('Move pending already')
-        } else if (state.pendingMove.locs.length >= state.preview.acquireCellCount) {
+        } else if (state.pendingMove.locs.length >= state.preview.acquireCount) {
           throw new Error('Too many cells selected already')
         }
       }
@@ -61,11 +55,14 @@ const slice = createSlice({
       }
       state.pendingMove.locs.push(loc)
       Board.prototype.acquireOne.call(state.preview, player, loc)
-      if (state.pendingMove.locs.length === state.preview.acquireCellCount) {
+      if (state.pendingMove.locs.length === state.preview.acquireCount) {
         state.canCommit = true
       }
     },
     acquire: (state, action: PayloadAction<Omit<AcquireMove, 'kind'>>) => {
+      if (state.preview === null) {
+        throw new Error('No board yet')
+      }
       const { player, locs } = action.payload
       if (state.pendingMove !== null) {
         throw new Error('Move pending already')
@@ -75,6 +72,9 @@ const slice = createSlice({
       state.canCommit = true
     },
     conquer: (state, action: PayloadAction<Omit<ConquerMove, 'kind'>>) => {
+      if (state.preview === null) {
+        throw new Error('No board yet')
+      }
       const { player } = action.payload
       if (state.pendingMove !== null) {
         throw new Error('Move pending already')
@@ -84,6 +84,9 @@ const slice = createSlice({
       state.canCommit = true
     },
     vanquish: (state, action: PayloadAction<Omit<VanquishMove, 'kind'>>) => {
+      if (state.preview === null) {
+        throw new Error('No board yet')
+      }
       const { player, topLeft } = action.payload
       if (state.pendingMove !== null) {
         throw new Error('Move pending already')
@@ -93,6 +96,9 @@ const slice = createSlice({
       state.canCommit = true
     },
     conquest: (state, action: PayloadAction<Omit<ConquestMove, 'kind'>>) => {
+      if (state.preview === null) {
+        throw new Error('No board yet')
+      }
       const { player } = action.payload
       if (state.pendingMove !== null) {
         throw new Error('Move pending already')
@@ -102,12 +108,18 @@ const slice = createSlice({
       state.canCommit = true
     },
     commit: (state) => {
+      if (state.preview === null) {
+        throw new Error('No board yet')
+      }
       state.boards.push(state.preview)
       state.pendingMove = null
       state.canCommit = false
     },
     restore: (state) => {
-      state.preview = JSON.parse(JSON.stringify(state.boards[state.boards.length - 1]))
+      if (state.preview === null) {
+        throw new Error('No board yet')
+      }
+      state.preview = state.boards[state.boards.length - 1]
       state.pendingMove = null
       state.canCommit = false
     }
@@ -126,5 +138,5 @@ export const remoteCommit = createAsyncThunk<unknown, undefined>(
   }
 )
 
-export const { unacquireOne, acquireOne, acquire, conquer, vanquish, conquest, commit, restore } = slice.actions
+export const { initBoard, unacquireOne, acquireOne, acquire, conquer, vanquish, conquest, commit, restore } = slice.actions
 export default slice.reducer

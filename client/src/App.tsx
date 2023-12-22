@@ -1,13 +1,19 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { Routes, Route } from 'react-router-dom'
 
 import GameView from './components/GameView'
 import LoginForm from './components/LoginForm'
 import SignupForm from './components/SignupForm'
-
 import Navbar from './components/Navbar'
 
-function App (): JSX.Element {
+import { useAppDispatch } from './hooks'
+import { initUserStorage } from './slices/userSlice'
+
+const App = (): JSX.Element => {
+  const dispatch = useAppDispatch()
+  useEffect(() => {
+    dispatch(initUserStorage())
+  }, [])
   return (
     <div>
       <Navbar />
