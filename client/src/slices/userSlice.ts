@@ -1,6 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit'
 import { type AppDispatch } from '../store'
-import socket from '../services/socket'
+import socket, { setToken } from '../services/socket'
 
 export interface UserData {
   token: string
@@ -29,6 +29,7 @@ export const initUserStorage = () => {
     if (userJSON !== null) {
       const user = JSON.parse(userJSON)
       dispatch(setUser(user))
+      setToken(user.token)
       socket.connect()
     }
   }
@@ -38,6 +39,7 @@ export const setUserStorage = (user: UserData) => {
   return (dispatch: AppDispatch) => {
     window.localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user))
     dispatch(setUser(user))
+    setToken(user.token)
     socket.connect()
   }
 }
@@ -45,6 +47,7 @@ export const setUserStorage = (user: UserData) => {
 export const clearUserStorage = () => {
   return (dispatch: AppDispatch) => {
     window.localStorage.removeItem(USER_STORAGE_KEY)
+    setToken('')
     socket.disconnect()
     dispatch(clearUser())
   }

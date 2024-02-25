@@ -9,14 +9,20 @@ interface BoardViewProps {
 
 function blendColors (colorA: string, colorB: string): string {
   const mix = (a: number, b: number): number => Math.round(Math.sqrt((a * a + b * b) / 2))
+
   function toHexString (n: number): string {
     return n.toString(16).padStart(2, '0')
   }
 
+  function matchHexByte (s: string): RegExpMatchArray {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    return s.match(/[0-9A-F][0-9A-F]/g)!
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-  const [rA, gA, bA] = colorA.match(/\w\w/g)!.map((c: string) => parseInt(c, 16))
+  const [rA, gA, bA] = matchHexByte(colorA).map((c: string) => parseInt(c, 16))
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-  const [rB, gB, bB] = colorB.match(/\w\w/g)!.map((c: string) => parseInt(c, 16))
+  const [rB, gB, bB] = matchHexByte(colorB).map((c: string) => parseInt(c, 16))
 
   const r = mix(rA, rB)
   const g = mix(gA, gB)
@@ -27,6 +33,15 @@ function blendColors (colorA: string, colorB: string): string {
 function BoardView (props: BoardViewProps): JSX.Element {
   const originalBoard = useAppSelector(state => state.boardHistory.boards[state.boardHistory.boards.length - 1])
   const previewBoard = useAppSelector(state => state.boardHistory.preview)
+
+  if (previewBoard === null) {
+    return (
+      <div>
+        <p>So um the preview is somehow null</p>
+        <p>Gl finding the error</p>
+      </div>
+    )
+  }
 
   const colors = ['#ffffff', '#ff88aa', '#88ffaa', '#aa88ff', '#aaff88', '#ffaa88', '#88aaff']
 

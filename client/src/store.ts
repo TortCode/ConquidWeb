@@ -1,6 +1,6 @@
 import { configureStore } from '@reduxjs/toolkit'
 import type { Middleware } from '@reduxjs/toolkit'
-import boardHistorySlice, { acquire, commit, conquer, conquest, vanquish } from './slices/boardHistorySlice'
+import boardHistorySlice, { executeMove, commit, addPlayerId, type BoardHistoryState } from './slices/boardHistorySlice'
 import userSlice from './slices/userSlice'
 import socket from './services/socket'
 import type { Socket } from 'socket.io-client'
@@ -8,23 +8,19 @@ import type { Move } from '../../engine/src/ConquidBoard'
 
 const socketMiddleware = (socket: Socket): Middleware => {
   return (api) => {
-    socket.on('move', (move: Move) => {
+    socket.on('player_joined', (playerId: string) => {
+      console.log('player joined', playerId)
+      api.dispatch(addPlayerId(playerId))
+    })
+    socket.on('move_done', ([i, move]: [number, Move]) => {
       console.log('received move', move)
-      switch (move.kind) {
-        case 'acquire':
-          api.dispatch(acquire(move))
-          break
-        case 'conquer':
-          api.dispatch(conquer(move))
-          break
-        case 'vanquish':
-          api.dispatch(vanquish(move))
-          break
-        case 'conquest':
-          api.dispatch(conquest(move))
-          break
+      const state = api.getState().boardHistory as BoardHistoryState
+      if (state.boards.length === i) {
+        executeMove(api, move)
+        api.dispatch(commit())
+      } else {
+        console.log('received move too early')
       }
-      api.dispatch(commit())
     })
     return (next) => (action) => next(action)
   }

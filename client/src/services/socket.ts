@@ -1,11 +1,22 @@
 import { io } from 'socket.io-client'
-import store from '../store'
+
+let token: string = ''
+let gameId: string = 'bork'
+
+export const setToken = (newToken: string): void => {
+  token = newToken
+}
+
+export const setGameId = (newGameId: string): void => {
+  gameId = newGameId
+}
 
 const socket = io('ws://localhost:3000', {
   auth: (cb) => {
     // eslint-disable-next-line n/no-callback-literal
     cb({
-      token: store.getState().user?.token
+      token,
+      gameId
     })
   },
   autoConnect: false

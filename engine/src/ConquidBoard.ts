@@ -98,25 +98,36 @@ export interface BoardLike {
 }
 
 export class Board implements BoardLike {
-  public path: Position[]
-  public grid: Cell[][]
+  public path: Position[] = []
+  public grid: Cell[][] = []
 
   constructor (
     public readonly rows: number,
     public readonly cols: number,
     public readonly bases: BaseLocation[], 
-    public readonly acquireCount: number) {
-    this.grid = make2dArray<Cell>(rows, cols, () => ({ owner: 0, isBase: false }))
-    this.path = []
+    public readonly acquireCount: number
+    ) {
+  }
 
+  static fromConfig(rows: number, cols: number, bases: BaseLocation[], acquireCount: number): Board {
+    const board = new Board(rows, cols, bases, acquireCount)
+    board.grid = make2dArray<Cell>(rows, cols, () => ({ owner: 0, isBase: false }))
     bases.forEach((loc) => {
       for (let i = loc.startRow; i <= loc.endRow; i++) {
         for (let j = loc.startCol; j <= loc.endCol; j++) {
-          this.grid[i][j].owner = loc.owner
-          this.grid[i][j].isBase = true
+          board.grid[i][j].owner = loc.owner
+          board.grid[i][j].isBase = true
         }
       }
     })
+    return board
+  }
+
+  static fromObject(obj: BoardLike): Board {
+    const board = new Board(obj.rows, obj.cols, obj.bases, obj.acquireCount)
+    board.grid = obj.grid
+    board.path = obj.path
+    return board
   }
 
   toObject(): BoardLike {
@@ -137,14 +148,14 @@ export class Board implements BoardLike {
     return board
   }
 
-  check_acquire (player: Player, locs: Position[], desiredLength: number = this.acquireCount): void {
+  check_acquire (locs: Position[], desiredLength: number = this.acquireCount): void {
     // deduplicate values
     locs = [...new Set(locs)]
     if (locs.length !== desiredLength) {
       throw BadMoveError.acquireCount(locs.length)
     }
     locs.forEach(loc => {
-      if (!Board.prototype.posValid.call(this, loc)) {
+      if (!this.posValid(loc)) {
         throw BadMoveError.outOfBounds(loc)
       }
       if (this.grid[loc.r][loc.c].owner !== 0) {
@@ -155,12 +166,12 @@ export class Board implements BoardLike {
 
   acquireOne (player: Player, loc: Position): void {
     console.log(this)
-    Board.prototype.check_acquire.call(this, player, [loc], 1)
+    this.check_acquire([loc], 1)
     this.grid[loc.r][loc.c].owner = player
   }
 
   acquire (player: Player, locs: Position[]): void {
-    Board.prototype.check_acquire.call(this, player, locs)
+    this.check_acquire(locs)
     locs.forEach(loc => {
       this.grid[loc.r][loc.c].owner = player
     })
@@ -180,7 +191,7 @@ export class Board implements BoardLike {
     // begin teh konker
     while (q.length > 0) {
       const curr = q.shift()!
-      Board.prototype.adjacent.call(this, curr).forEach(adj => {
+      this.adjacent(curr).forEach(adj => {
         const { r, c } = adj
         if (
           this.grid[r][c].owner !== 0
@@ -198,8 +209,8 @@ export class Board implements BoardLike {
 
   check_vanquish(player: Player, topLeft: Position): void {
     let surrounding = 0
-    Board.prototype.surround4x4.call(this, topLeft).forEach(surr => {
-      if (Board.prototype.posValid.call(this, surr)
+    this.surround4x4(topLeft).forEach(surr => {
+      if (this.posValid(surr)
       && this.grid[surr.r][surr.c].owner === player) {
         surrounding += 1
       }
@@ -212,7 +223,7 @@ export class Board implements BoardLike {
     let foundOwner = false
     for (let r = topLeft.r; r < topLeft.r + 4; r++) {
       for (let c = topLeft.c; c < topLeft.c + 4; c++) {
-        if (!Board.prototype.posValid({ r, c })) {
+        if (!this.posValid({ r, c })) {
           throw BadMoveError.outOfBounds({ r, c })
         }
         const curr = this.grid[r][c]
@@ -227,16 +238,14 @@ export class Board implements BoardLike {
   }
 
   vanquish (player: Player, topLeft: Position): void {
-    Board.prototype.check_vanquish.call(this, player, topLeft)
+    this.check_vanquish(player, topLeft)
 
     const square: Cell[] = []
     for (let r = topLeft.r; r < topLeft.r + 4; r++) {
       for (let c = topLeft.c; c < topLeft.c + 4; c++) {
-        if (Board.prototype.posValid.call(this, { r, c })) {
-          const curr = this.grid[r][c]
-          if (!curr.isBase) {
-            curr.owner = 0
-          }
+        const curr = this.grid[r][c]
+        if (!curr.isBase) {
+          curr.owner = 0
         }
       }
     }
@@ -261,7 +270,7 @@ export class Board implements BoardLike {
     while (q.length > 0 && !found) {
       const curr = q.shift()!
       visited[curr.r][curr.c] = true
-      Board.prototype.adjacent.call(this, curr).forEach(adj => {
+      this.adjacent(curr).forEach(adj => {
         const adjCell = this.grid[adj.r][adj.c]
         if (!visited[curr.r][curr.c] &&
           adjCell.owner === player) {
@@ -288,7 +297,7 @@ export class Board implements BoardLike {
   }
 
   conquest (player: Player): void {
-    const path = Board.prototype.check_conquest.call(this, player)
+    const path = this.check_conquest(player)
     this.path = path
   }
 
@@ -307,7 +316,7 @@ export class Board implements BoardLike {
         r: curr.r + offset[0],
         c: curr.c + offset[1]
       }))
-      .filter(pos => (Board.prototype.posValid.call(this,pos)))
+      .filter(pos => this.posValid(pos))
   }
 
   private surround4x4 (topLeft: Position): Position[] {
@@ -323,7 +332,7 @@ export class Board implements BoardLike {
         r: topLeft.r + offset[0],
         c: topLeft.c + offset[1]
       }))
-      .filter(pos => (Board.prototype.posValid.call(this,pos)))
+      .filter(pos => this.posValid(pos))
   }
 }
 

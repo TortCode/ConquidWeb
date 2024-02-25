@@ -8,11 +8,13 @@ import { Server } from 'socket.io'
 
 import { authMiddleware } from './utils/middleware'
 
-import { BadMoveError, Board } from '../../engine/src/ConquidBoard'
+import { BadMoveError } from '../../engine/src/ConquidBoard'
 import type { Move } from '../../engine/src/ConquidBoard'
+import type { JoinGameResponse } from '../../engine/src/comm'
 
 import usersRouter from './controllers/users'
 import loginRouter from './controllers/login'
+import GameManager from './GameManager'
 
 dotenv.config()
 
@@ -26,10 +28,6 @@ mongoose.connect(
   console.log('error connecting to MongoDB:', error.message)
   throw error
 })
-
-const assertNever = (x: never): never => {
-  throw new Error('Unexpected object: ' + (x as string))
-}
 
 const app = express()
 app.use(express.json())
@@ -45,26 +43,7 @@ const io = new Server(server, {
   }
 })
 
-const bases = [
-  {
-    owner: 1,
-    startRow: 6,
-    endRow: 7,
-    startCol: 4,
-    endCol: 5
-  },
-  {
-    owner: 2,
-    startRow: 6,
-    endRow: 7,
-    startCol: 22,
-    endCol: 23
-  }
-]
-
-const boards = [new Board(14, 28, bases, 3)]
-const moves = [] as Move[]
-const playerIds = [] as string[]
+const bm = new GameManager()
 
 io.use(authMiddleware)
 
@@ -72,53 +51,36 @@ io.on('connection', (socket) => {
   socket.on('message', (msg) => {
     console.log(msg)
   })
-  socket.on('joingame', async (cb: (v: { moves: Move[], pno: number }) => void) => {
-    if (playerIds.length === 2) {
-      console.log('game full')
-      return
+  socket.on('game_join', async (cb: (v: JoinGameResponse) => void) => {
+    try {
+      console.log('game_join', socket.data.userId)
+      const userId = socket.data.userId as string
+      const user = await User.findById(userId)
+      if (user === null) {
+        console.log(`user ${userId} not found`)
+        return
+      }
+      if (bm.hasPlayer(userId)) {
+        console.log(`user ${userId} already joined`)
+      } else {
+        bm.addPlayer(userId)
+        socket.broadcast.emit('player_joined', userId)
+      }
+      // eslint-disable-next-line n/no-callback-literal
+      cb({ moves: bm.getMoves(), players: bm.getPlayerIds() })
+    } catch (err) {
+      console.log(err)
     }
-    const userId = socket.data.userId as string
-    const user = await User.findById(userId)
-    if (user === null) {
-      console.log(`user ${userId} not found`)
-      return
-    }
-    if (playerIds.includes(userId)) {
-      console.log(`user ${userId} already joined`)
-    } else {
-      playerIds.push(userId)
-    }
-    // eslint-disable-next-line n/no-callback-literal
-    cb({ moves, pno: playerIds.indexOf(userId) + 1 })
   })
   socket.on('move', (move: Move) => {
     const userId = socket.data.userId as string
-    const expectedPlayer = playerIds.indexOf(userId) + 1
-    console.log('MOVE', move)
+    console.log('MOVE', userId, move)
     try {
-      if (expectedPlayer !== move.player) {
-        throw new Error('NOT YOUR TURN!!!')
+      if (bm.getPlayerNo(userId) !== move.player) {
+        throw new Error('STOP MESSING WITH THE SYSTEM')
       }
-      const board = boards[boards.length - 1].clone()
-      switch (move.kind) {
-        case 'acquire':
-          board.acquire(move.player, move.locs)
-          break
-        case 'conquer':
-          board.conquer(move.player)
-          break
-        case 'vanquish':
-          board.vanquish(move.player, move.topLeft)
-          break
-        case 'conquest':
-          board.conquest(move.player)
-          break
-        default: {
-          assertNever(move)
-        }
-      }
-      boards.push(board)
-      socket.broadcast.emit('move', move)
+      const indexedMove = bm.executeMove(move)
+      socket.broadcast.emit('move_done', { move: indexedMove })
     } catch (err: unknown) {
       if (err instanceof BadMoveError) {
         console.log('user error:', err.unwrap())
