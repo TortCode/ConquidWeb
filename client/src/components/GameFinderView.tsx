@@ -19,7 +19,7 @@ const findAllGames = async (): Promise<GameInfo[]> => {
 }
 
 const GameFinderView = (): JSX.Element => {
-  const dispatch = useAppDispatch()!
+  const dispatch = useAppDispatch()
   const userId = useAppSelector((state) => state.user?.id)!
   const [gameList, setGameList] = useState<GameInfo[] | null>(null)
 

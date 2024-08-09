@@ -1,6 +1,7 @@
 import { make2dArray } from './utils'
 
 export type Player = number
+
 export interface Cell {
   owner: Player
   isBase: boolean

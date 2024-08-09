@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken'
 
 export const authMiddleware = (socket: Socket, next: (err?: Error) => void): void => {
   const token = socket.handshake.auth.token
+  const gameId = socket.handshake.auth.gameId
   if (token == null) {
     next(new Error('Authentication error'))
   }
@@ -10,6 +11,7 @@ export const authMiddleware = (socket: Socket, next: (err?: Error) => void): voi
     const payload = jwt.verify(token, process.env.SECRET as string)
     if (payload !== null && typeof (payload) === 'object' && typeof (payload.id) === 'string') {
       socket.data.userId = payload.id
+      socket.data.gameId = gameId
       next()
     } else {
       next(new Error('Invalid payload'))

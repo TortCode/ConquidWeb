@@ -1,5 +1,7 @@
 import { Board, type Move } from '../../engine/src/ConquidBoard'
+import type { IGame } from './models/game'
 import { assertNever } from './utils/assert'
+import { randomUUID } from 'crypto'
 
 export class GameNotStartedError extends Error {
   constructor () {
@@ -30,14 +32,17 @@ export class GameTurnError extends Error {
 }
 
 export default class GameManager {
-  private readonly gameId: string = 'theOne'
-  private readonly board: Board
-  private readonly moves: Move[]
-  private readonly playerIds: string[]
-  private hasStarted: boolean = false
-  private hasEnded: boolean = false
+  constructor (
+    private readonly gameId: string = 'theOne',
+    private readonly board: Board,
+    private readonly moves: Move[] = [],
+    private readonly playerIds: string[] = [],
+    private hasStarted: boolean = false,
+    private hasEnded: boolean = false
+  ) {
+  }
 
-  constructor () {
+  static create (): GameManager {
     const bases = [
       {
         owner: 1,
@@ -54,9 +59,31 @@ export default class GameManager {
         endCol: 23
       }
     ]
-    this.board = new Board(14, 28, bases, 3)
-    this.moves = []
-    this.playerIds = []
+    const gameId = randomUUID()
+    const gm = new GameManager(gameId, new Board(14, 28, bases, 3))
+    return gm
+  }
+
+  static fromObject (obj: IGame): GameManager {
+    return new GameManager(
+      obj.gameId,
+      Board.fromObject(obj.board),
+      obj.moves,
+      obj.playerIds,
+      obj.hasStarted,
+      obj.hasEnded
+    )
+  }
+
+  toObject (): IGame {
+    return {
+      gameId: this.gameId,
+      board: this.board.toObject(),
+      moves: this.moves,
+      playerIds: this.playerIds,
+      hasStarted: this.hasStarted,
+      hasEnded: this.hasEnded
+    }
   }
 
   getRoomName (): string {
